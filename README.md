@@ -2,6 +2,10 @@
 
 VS Code extension that extracts hardcoded UI strings into JSON dictionaries and replaces inline text with translation calls.
 
+## Demo
+
+![i18n Assistant demo](./i18n-assistant.gif)
+
 ## Why
 
 Managing i18n manually is slow and error-prone:
