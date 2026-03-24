@@ -1,0 +1,129 @@
+{
+  "name": "i18n-assistant",
+  "displayName": "i18n Assistant",
+  "description": "Extract selected text to translation dictionaries and replace it with t(\"key\")",
+  "version": "0.0.2",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:typescript"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "i18nAssistant.extractToDictionary",
+        "title": "i18n: Extract Selected Text"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "i18nAssistant.extractToDictionary",
+        "key": "cmd+shift+alt+t",
+        "mac": "cmd+shift+alt+t",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "i18nAssistant.extractToDictionary",
+          "when": "editorTextFocus && editorHasSelection",
+          "group": "navigation@50"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "i18n Assistant",
+      "properties": {
+        "i18nAssistant.languages": {
+          "type": "array",
+          "default": [
+            "uk",
+            "en",
+            "pl"
+          ],
+          "description": "Supported languages. One JSON dictionary file is expected per language code."
+        },
+        "i18nAssistant.baseLanguage": {
+          "type": "string",
+          "default": "uk",
+          "description": "Reference language used as source text for missing translations."
+        },
+        "i18nAssistant.dictionaryRootPath": {
+          "type": "string",
+          "default": ".",
+          "description": "Dictionary root path relative to workspace root. dictionaryDir is resolved from this root."
+        },
+        "i18nAssistant.dictionaryRootPaths": {
+          "type": "array",
+          "default": [],
+          "description": "Optional list of dictionary roots for monorepo projects. The extension picks the nearest matching root for the current file.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "i18nAssistant.dictionaryDir": {
+          "type": "string",
+          "default": "dictionaries",
+          "description": "Path to dictionaries directory relative to workspace root."
+        },
+        "i18nAssistant.missingTranslationStrategy": {
+          "type": "string",
+          "enum": [
+            "empty-marker",
+            "copy-base"
+          ],
+          "default": "empty-marker",
+          "description": "How to fill missing non-base translations when input is empty."
+        },
+        "i18nAssistant.runPostHook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run postHookCommand after dictionary update."
+        },
+        "i18nAssistant.postHookCommand": {
+          "type": "string",
+          "default": "npm run i18n:check-empty",
+          "description": "Command to execute in workspace root after extraction."
+        },
+        "i18nAssistant.translationImportModule": {
+          "type": "string",
+          "default": "react-i18next",
+          "description": "Module name for translation hook import, for example react-i18next or next-intl."
+        },
+        "i18nAssistant.translationImportName": {
+          "type": "string",
+          "default": "useTranslation",
+          "description": "Named import for translation hook/function, for example useTranslation or useTranslations."
+        },
+        "i18nAssistant.translationHookSnippet": {
+          "type": "string",
+          "default": "const { t } = useTranslation();",
+          "description": "Code snippet inserted inside component when translation hook is missing."
+        },
+        "i18nAssistant.translationFunctionName": {
+          "type": "string",
+          "default": "t",
+          "description": "Function name used in replacement expression, for example t."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "node ./scripts/lint.mjs",
+    "test": "node ./scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0"
+  },
+  "private": true
+}
