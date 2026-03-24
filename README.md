@@ -163,7 +163,3 @@ npm run test
 - AST-based replacement for edge-case safety.
 - Output channel for step-by-step diagnostics.
 - Optional key naming templates by folder/domain.
-
-## Detailed Guide
-
-For full real-world setup and examples see REAL_WORLD_GUIDE.md.
