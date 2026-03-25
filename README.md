@@ -4,7 +4,7 @@ VS Code extension that extracts hardcoded UI strings into JSON dictionaries and 
 
 ## Demo
 
-![i18n Assistant demo](./i18n-assistant.gif)
+![i18n Assistant demo](https://raw.githubusercontent.com/tonichiga/vscode-i18n-assistant/main/i18n-assistant.gif)
 
 ## Why
 
@@ -73,7 +73,7 @@ Set in VS Code Settings JSON.
 - i18nAssistant.languages: list of language codes.
 - i18nAssistant.baseLanguage: reference language.
 - i18nAssistant.dictionaryRootPath: single dictionary root (relative to workspace).
-- i18nAssistant.dictionaryRootPaths: optional list of roots for monorepo.
+- i18nAssistant.dictionaryRootPaths: optional list of roots for monorepo (supports per-root languages).
 - i18nAssistant.dictionaryDir: dictionary folder name relative to selected root.
 - i18nAssistant.missingTranslationStrategy: empty-marker or copy-base.
 
@@ -123,23 +123,46 @@ Set in VS Code Settings JSON.
 
 ## Monorepo Example
 
+`i18nAssistant.dictionaryRootPaths` supports 3 item formats:
+
+- `"apps/app"`
+- `["apps/landing", ["en", "cs"], "en"]`
+- `{ "rootPath": "apps/landing-business", "languages": ["en", "uk"], "baseLanguage": "uk" }`
+
+Notes:
+
+- Languages count is not limited.
+- Tuple format means: `[rootPath, languages?, baseLanguage?]`.
+- Object format means: `{ rootPath, languages?, baseLanguage? }`.
+
 ```json
 {
+  "i18nAssistant.languages": ["uk", "en", "pl"],
+  "i18nAssistant.baseLanguage": "uk",
   "i18nAssistant.dictionaryRootPaths": [
-    "apps/app",
-    "apps/landing",
-    "apps/business"
+    ["apps/app", ["en", "ru", "uk"]],
+    ["apps/landing", ["en", "cs"], "en"],
+    {
+      "rootPath": "apps/landing-business",
+      "languages": ["en", "uk"],
+      "baseLanguage": "uk"
+    },
+    "apps/academy"
   ],
   "i18nAssistant.dictionaryDir": "dictionaries"
 }
 ```
+
+- If root languages are omitted (for example `"apps/academy"`), global `i18nAssistant.languages` are used.
+- If `i18nAssistant.dictionaryRootPaths` is empty, extension uses `i18nAssistant.dictionaryRootPath` + global `i18nAssistant.languages` and `i18nAssistant.baseLanguage`.
+- If root `baseLanguage` is omitted, global `i18nAssistant.baseLanguage` is used.
 
 The extension picks the nearest root for the active file.
 
 Example:
 
 - editing file in apps/landing/src/... updates apps/landing/dictionaries/\*.json
-- editing file in apps/business/src/... updates apps/business/dictionaries/\*.json
+- editing file in apps/landing-business/src/... updates apps/landing-business/dictionaries/\*.json
 
 ## Validation
 

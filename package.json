@@ -2,8 +2,13 @@
   "name": "i18n-assistant",
   "displayName": "i18n Assistant",
   "description": "Extract selected text to translation dictionaries and replace it with t(\"key\")",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonichiga/vscode-i18n-assistant.git"
+  },
+  "icon": "/icon.png",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -66,9 +71,52 @@
         "i18nAssistant.dictionaryRootPaths": {
           "type": "array",
           "default": [],
-          "description": "Optional list of dictionary roots for monorepo projects. The extension picks the nearest matching root for the current file.",
+          "description": "Optional monorepo dictionary roots. Supports: string root path, tuple [rootPath, languages, baseLanguage?], or object { rootPath, languages?, baseLanguage? }. If languages are omitted, global i18nAssistant.languages are used.",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "required": [
+                  "rootPath"
+                ],
+                "properties": {
+                  "rootPath": {
+                    "type": "string"
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "baseLanguage": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           }
         },
         "i18nAssistant.dictionaryDir": {

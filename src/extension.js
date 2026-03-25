@@ -112,12 +112,174 @@ function getWorkspaceRoot() {
   return folders[0].uri.fsPath;
 }
 
+function normalizeLanguageList(rawLanguages, settingName) {
+  if (!Array.isArray(rawLanguages) || rawLanguages.length === 0) {
+    throw new Error(
+      `Setting ${settingName} must contain at least one language.`,
+    );
+  }
+
+  const normalized = rawLanguages
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    throw new Error(
+      `Setting ${settingName} must contain at least one language.`,
+    );
+  }
+
+  return Array.from(new Set(normalized));
+}
+
+function validateLanguageConfig(rawLanguages, rawBaseLanguage, settingName) {
+  const languages = normalizeLanguageList(rawLanguages, settingName);
+  const baseLanguage =
+    typeof rawBaseLanguage === "string" ? rawBaseLanguage.trim() : "";
+
+  if (!baseLanguage) {
+    throw new Error("Setting i18nAssistant.baseLanguage is required.");
+  }
+
+  if (!languages.includes(baseLanguage)) {
+    throw new Error(
+      `Base language ${baseLanguage} must be listed in ${settingName}.`,
+    );
+  }
+
+  return { languages, baseLanguage };
+}
+
+function parseDictionaryRootEntry(
+  entry,
+  globalLanguages,
+  globalBaseLanguage,
+  index,
+) {
+  const defaultLanguages = [...globalLanguages];
+  const defaultBaseLanguage = globalBaseLanguage;
+
+  if (typeof entry === "string") {
+    const rootPath = entry.trim();
+    if (!rootPath) {
+      throw new Error(
+        `Setting i18nAssistant.dictionaryRootPaths[${index}] has an empty root path.`,
+      );
+    }
+
+    return {
+      rootPath,
+      languages: defaultLanguages,
+      baseLanguage: defaultBaseLanguage,
+    };
+  }
+
+  if (Array.isArray(entry)) {
+    const [rawRootPath, rawLanguages, rawBaseLanguage] = entry;
+    const rootPath = typeof rawRootPath === "string" ? rawRootPath.trim() : "";
+
+    if (!rootPath) {
+      throw new Error(
+        `Setting i18nAssistant.dictionaryRootPaths[${index}][0] must be a non-empty root path string.`,
+      );
+    }
+
+    const languages =
+      rawLanguages === undefined
+        ? defaultLanguages
+        : normalizeLanguageList(
+            rawLanguages,
+            `i18nAssistant.dictionaryRootPaths[${index}][1]`,
+          );
+
+    const baseLanguage =
+      typeof rawBaseLanguage === "string" && rawBaseLanguage.trim()
+        ? rawBaseLanguage.trim()
+        : defaultBaseLanguage;
+
+    if (!languages.includes(baseLanguage)) {
+      throw new Error(
+        `Base language ${baseLanguage} must be listed in i18nAssistant.dictionaryRootPaths[${index}][1].`,
+      );
+    }
+
+    return { rootPath, languages, baseLanguage };
+  }
+
+  if (entry && typeof entry === "object") {
+    const rootPath =
+      typeof entry.rootPath === "string" ? entry.rootPath.trim() : "";
+
+    if (!rootPath) {
+      throw new Error(
+        `Setting i18nAssistant.dictionaryRootPaths[${index}].rootPath must be a non-empty string.`,
+      );
+    }
+
+    const languages =
+      entry.languages === undefined
+        ? defaultLanguages
+        : normalizeLanguageList(
+            entry.languages,
+            `i18nAssistant.dictionaryRootPaths[${index}].languages`,
+          );
+
+    const baseLanguage =
+      typeof entry.baseLanguage === "string" && entry.baseLanguage.trim()
+        ? entry.baseLanguage.trim()
+        : defaultBaseLanguage;
+
+    if (!languages.includes(baseLanguage)) {
+      throw new Error(
+        `Base language ${baseLanguage} must be listed in i18nAssistant.dictionaryRootPaths[${index}].languages.`,
+      );
+    }
+
+    return { rootPath, languages, baseLanguage };
+  }
+
+  throw new Error(
+    "Setting i18nAssistant.dictionaryRootPaths items must be strings, arrays, or objects.",
+  );
+}
+
+function parseDictionaryRootEntries(
+  rawEntries,
+  globalLanguages,
+  globalBaseLanguage,
+) {
+  if (!Array.isArray(rawEntries)) {
+    throw new Error(
+      "Setting i18nAssistant.dictionaryRootPaths must be an array.",
+    );
+  }
+
+  const parsed = rawEntries.map((entry, index) =>
+    parseDictionaryRootEntry(entry, globalLanguages, globalBaseLanguage, index),
+  );
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const item of parsed) {
+    if (seen.has(item.rootPath)) {
+      continue;
+    }
+
+    seen.add(item.rootPath);
+    unique.push(item);
+  }
+
+  return unique;
+}
+
 function getConfig() {
   const config = vscode.workspace.getConfiguration("i18nAssistant");
-  const languages = config.get("languages", ["uk", "en", "pl"]);
-  const baseLanguage = config.get("baseLanguage", "uk");
+  const rawLanguages = config.get("languages", ["uk", "en", "pl"]);
+  const rawBaseLanguage = config.get("baseLanguage", "uk");
   const dictionaryRootPath = config.get("dictionaryRootPath", ".");
-  const dictionaryRootPaths = config.get("dictionaryRootPaths", []);
+  const rawDictionaryRootPaths = config.get("dictionaryRootPaths", []);
   const dictionaryDir = config.get("dictionaryDir", "dictionaries");
   const missingTranslationStrategy = config.get(
     "missingTranslationStrategy",
@@ -142,17 +304,13 @@ function getConfig() {
   );
   const translationFunctionName = config.get("translationFunctionName", "t");
 
-  if (!Array.isArray(languages) || languages.length === 0) {
-    throw new Error(
-      "Setting i18nAssistant.languages must contain at least one language.",
-    );
-  }
-
-  if (!languages.includes(baseLanguage)) {
-    throw new Error(
-      "Setting i18nAssistant.baseLanguage must be listed in i18nAssistant.languages.",
-    );
-  }
+  const languageConfig = validateLanguageConfig(
+    rawLanguages,
+    rawBaseLanguage,
+    "i18nAssistant.languages",
+  );
+  const languages = languageConfig.languages;
+  const baseLanguage = languageConfig.baseLanguage;
 
   if (!translationImportModule || !translationImportModule.trim()) {
     throw new Error(
@@ -180,20 +338,17 @@ function getConfig() {
     throw new Error("Setting i18nAssistant.dictionaryRootPath is required.");
   }
 
-  if (!Array.isArray(dictionaryRootPaths)) {
-    throw new Error(
-      "Setting i18nAssistant.dictionaryRootPaths must be an array.",
-    );
-  }
+  const dictionaryRoots = parseDictionaryRootEntries(
+    rawDictionaryRootPaths,
+    languages,
+    baseLanguage,
+  );
 
   return {
     languages,
     baseLanguage,
     dictionaryRootPath: dictionaryRootPath.trim(),
-    dictionaryRootPaths: dictionaryRootPaths
-      .filter((item) => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean),
+    dictionaryRoots,
     dictionaryDir,
     missingTranslationStrategy,
     runPostHook,
@@ -223,36 +378,49 @@ function isPathInside(parentPath, childPath) {
 
 function getDictionaryRootCandidates(workspaceRoot, config) {
   const configuredRoots =
-    config.dictionaryRootPaths.length > 0
-      ? config.dictionaryRootPaths
-      : [config.dictionaryRootPath];
+    config.dictionaryRoots.length > 0
+      ? config.dictionaryRoots
+      : [
+          {
+            rootPath: config.dictionaryRootPath,
+            languages: config.languages,
+            baseLanguage: config.baseLanguage,
+          },
+        ];
 
-  const unique = Array.from(new Set(configuredRoots));
-  return unique.map((root) => resolveConfiguredPath(workspaceRoot, root));
+  return configuredRoots.map((item) => ({
+    rootPath: resolveConfiguredPath(workspaceRoot, item.rootPath),
+    languages: item.languages,
+    baseLanguage: item.baseLanguage,
+  }));
 }
 
-function resolveDictionaryRoot(workspaceRoot, activeFilePath, config) {
+function resolveDictionaryTarget(workspaceRoot, activeFilePath, config) {
   const candidates = getDictionaryRootCandidates(workspaceRoot, config);
 
   if (candidates.length === 0) {
-    return workspaceRoot;
+    return {
+      rootPath: workspaceRoot,
+      languages: config.languages,
+      baseLanguage: config.baseLanguage,
+    };
   }
 
   const inScope = candidates
-    .filter((rootPath) => isPathInside(rootPath, activeFilePath))
-    .sort((a, b) => b.length - a.length);
+    .filter((item) => isPathInside(item.rootPath, activeFilePath))
+    .sort((a, b) => b.rootPath.length - a.rootPath.length);
 
   const orderedCandidates = inScope.length > 0 ? inScope : candidates;
 
-  for (const rootPath of orderedCandidates) {
+  for (const candidate of orderedCandidates) {
     const baseDictionary = path.join(
-      rootPath,
+      candidate.rootPath,
       config.dictionaryDir,
-      `${config.baseLanguage}.json`,
+      `${candidate.baseLanguage}.json`,
     );
 
     if (fs.existsSync(baseDictionary)) {
-      return rootPath;
+      return candidate;
     }
   }
 
@@ -793,8 +961,20 @@ async function runExtractFlow(input) {
   }
 
   const config = getConfig();
-  const payload = await askPayloadViaWebview(
+  const workspaceRoot = getWorkspaceRoot();
+  const selectedDictionaryTarget = resolveDictionaryTarget(
+    workspaceRoot,
+    document.uri.fsPath,
     config,
+  );
+  const effectiveConfig = {
+    ...config,
+    languages: selectedDictionaryTarget.languages,
+    baseLanguage: selectedDictionaryTarget.baseLanguage,
+  };
+
+  const payload = await askPayloadViaWebview(
+    effectiveConfig,
     selectedText,
     suggestKeyFromText(selectedText),
   );
@@ -802,22 +982,15 @@ async function runExtractFlow(input) {
   if (!payload) {
     return;
   }
-
-  const workspaceRoot = getWorkspaceRoot();
-  const selectedDictionaryRoot = resolveDictionaryRoot(
-    workspaceRoot,
-    document.uri.fsPath,
-    config,
-  );
   const dictionaryRoot = path.join(
-    selectedDictionaryRoot,
+    selectedDictionaryTarget.rootPath,
     config.dictionaryDir,
   );
   const keyPath = payload.keyPath;
   const translations = payload.translations;
 
   const dictionariesByLang = {};
-  for (const lang of config.languages) {
+  for (const lang of effectiveConfig.languages) {
     const dictionaryFilePath = path.join(dictionaryRoot, `${lang}.json`);
     dictionariesByLang[lang] = {
       filePath: dictionaryFilePath,
@@ -826,13 +999,13 @@ async function runExtractFlow(input) {
   }
 
   const existingInBase = getNestedValue(
-    dictionariesByLang[config.baseLanguage].data,
+    dictionariesByLang[effectiveConfig.baseLanguage].data,
     keyPath,
   );
 
   if (typeof existingInBase === "string") {
     const choice = await vscode.window.showQuickPick(["Overwrite", "Cancel"], {
-      title: `Key ${keyPath} already exists in ${config.baseLanguage}.json`,
+      title: `Key ${keyPath} already exists in ${effectiveConfig.baseLanguage}.json`,
       placeHolder: "Choose what to do",
     });
 
@@ -841,7 +1014,7 @@ async function runExtractFlow(input) {
     }
   }
 
-  for (const lang of config.languages) {
+  for (const lang of effectiveConfig.languages) {
     setNestedValue(dictionariesByLang[lang].data, keyPath, translations[lang]);
     saveJson(dictionariesByLang[lang].filePath, dictionariesByLang[lang].data);
   }
@@ -878,7 +1051,7 @@ async function runExtractFlow(input) {
   await runPostHookIfEnabled(config, workspaceRoot);
 
   vscode.window.showInformationMessage(
-    `i18n key ${keyPath} added for ${config.languages.join(", ")}.`,
+    `i18n key ${keyPath} added for ${effectiveConfig.languages.join(", ")}.`,
   );
 }
 
